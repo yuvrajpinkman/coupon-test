@@ -1,0 +1,48 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import pool from '../src/db.js';
+import { createCoupon } from '../src/commands/createCoupon.js';
+import { applyCoupon } from '../src/commands/applyCoupon.js';
+
+test('global usage limit is safe under concurrent applications', async () => {
+    const code = 'CONCURRENT1';
+
+    await pool.query('DELETE FROM orders');
+    await pool.query('DELETE FROM coupons');
+
+    await createCoupon(
+        code,
+        'percent',
+        10,
+        0,
+        '2027-01-01T00:00:00Z',
+        1
+    );
+
+    const attempts = Array.from({ length: 10 }, () =>
+        applyCoupon(100, code)
+            .then(() => true)
+            .catch(() => false)
+    );
+
+    const results = await Promise.all(attempts);
+
+    const successfulAttempts = results.filter(Boolean).length;
+
+    const couponResult = await pool.query(
+        'SELECT times_used FROM coupons WHERE code = $1',
+        [code]
+    );
+
+    const orderResult = await pool.query(
+        `SELECT COUNT(*) AS count
+     FROM orders
+     WHERE coupon_code = $1
+       AND status <> 'cancelled'`,
+        [code]
+    );
+
+    assert.equal(successfulAttempts, 1);
+    assert.equal(Number(couponResult.rows[0].times_used), 1);
+    assert.equal(Number(orderResult.rows[0].count), 1);
+});

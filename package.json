@@ -7,7 +7,7 @@
     "coupon": "./src/cli.js"
   },
   "scripts": {
-    "test": "node --test test/",
+    "test": "node --test test/*.test.js",
     "db:migrate": "node db/migrate.js",
     "db:seed": "node db/seed.js"
   },
