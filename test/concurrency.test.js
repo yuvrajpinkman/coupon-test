@@ -46,3 +46,49 @@ test('global usage limit is safe under concurrent applications', async () => {
     assert.equal(Number(couponResult.rows[0].times_used), 1);
     assert.equal(Number(orderResult.rows[0].count), 1);
 });
+
+test('per-user usage limit is safe under concurrent applications', async () => {
+    const code = 'CONCURRENT_USER';
+
+    await pool.query('DELETE FROM orders');
+    await pool.query('DELETE FROM coupons');
+
+    await createCoupon(
+        code,
+        'percent',
+        10,
+        0,
+        '2027-01-01T00:00:00Z',
+        10,
+        null,
+        1
+    );
+
+    const attempts = Array.from({ length: 10 }, () =>
+        applyCoupon(100, code, 'user1')
+            .then(() => true)
+            .catch(() => false)
+    );
+
+    const results = await Promise.all(attempts);
+
+    const successfulAttempts = results.filter(Boolean).length;
+
+    const orderResult = await pool.query(
+        `SELECT COUNT(*) AS count
+     FROM orders
+     WHERE coupon_code = $1
+       AND user_id = $2
+       AND status <> 'cancelled'`,
+        [code, 'user1']
+    );
+
+    const couponResult = await pool.query(
+        'SELECT times_used FROM coupons WHERE code = $1',
+        [code]
+    );
+
+    assert.equal(successfulAttempts, 1);
+    assert.equal(Number(orderResult.rows[0].count), 1);
+    assert.equal(Number(couponResult.rows[0].times_used), 1);
+});
