@@ -30,7 +30,48 @@ async function main() {
     case 'apply-coupons': {
       // usage: apply-coupons <cartTotal> <code1>,<code2> [userId]
       const [cartTotal, codes, userId] = args;
-      console.log(await applyCoupons(Number(cartTotal), codes.split(','), userId ?? null));
+
+      const couponCodes = codes.split(',');
+
+      const preview = await applyCoupons(
+        Number(cartTotal),
+        couponCodes,
+        userId ?? null,
+        false
+      );
+
+      console.log(`Valid coupons: ${preview.validCoupons.join(', ')}`);
+
+      if (preview.invalidCoupons.length > 0) {
+        for (const coupon of preview.invalidCoupons) {
+          console.log(`${coupon.code}: ${coupon.reason}`);
+        }
+      }
+
+      console.log(`Discount: ${preview.discountAmount}`);
+      console.log(`Final total: ${preview.finalTotal}`);
+
+      process.stdout.write('Proceed with this order? (y/n): ');
+
+      const answer = await new Promise((resolve) => {
+        process.stdin.once('data', (data) => {
+          resolve(data.toString().trim().toLowerCase());
+        });
+      });
+
+      if (answer !== 'y' && answer !== 'yes') {
+        console.log('Order cancelled. No coupons were consumed.');
+        break;
+      }
+
+      const result = await applyCoupons(
+        Number(cartTotal),
+        couponCodes,
+        userId ?? null,
+        true
+      );
+
+      console.log(result);
       break;
     }
     case 'cancel-order': {
