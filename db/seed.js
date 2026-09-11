@@ -1,5 +1,6 @@
 import pool from '../src/db.js';
 
+await pool.query('DELETE FROM order_coupons');
 await pool.query('DELETE FROM orders');
 await pool.query('DELETE FROM coupons');
 
