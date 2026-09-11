@@ -3,6 +3,8 @@ import assert from 'node:assert/strict';
 import pool from '../src/db.js';
 import { createCoupon } from '../src/commands/createCoupon.js';
 import { applyCoupon } from '../src/commands/applyCoupon.js';
+import { applyCoupons } from '../src/commands/applyCoupons.js';
+import { cancelOrder } from '../src/commands/cancelOrder.js';
 
 test('global usage limit is safe under concurrent applications', async () => {
     const code = 'CONCURRENT1';
@@ -162,4 +164,60 @@ test('failed transaction rolls back coupon usage', async () => {
     );
 
     assert.equal(Number(result.rows[0].times_used), 0);
+});
+
+test('cancelling a stacked coupon order releases all coupon usage', async () => {
+    await pool.query('DELETE FROM order_coupons');
+    await pool.query('DELETE FROM orders');
+    await pool.query('DELETE FROM coupons');
+
+    await createCoupon(
+        'STACK_PERCENT',
+        'percent',
+        10,
+        0,
+        '2027-01-01T00:00:00Z',
+        5
+    );
+
+    await createCoupon(
+        'STACK_FLAT',
+        'flat',
+        5,
+        0,
+        '2027-01-01T00:00:00Z',
+        5
+    );
+
+    const preview = await applyCoupons(
+        100,
+        ['STACK_PERCENT', 'STACK_FLAT'],
+        null,
+        false
+    );
+
+    assert.deepEqual(preview.validCoupons, [
+        'STACK_PERCENT',
+        'STACK_FLAT',
+    ]);
+
+    const result = await applyCoupons(
+        100,
+        ['STACK_PERCENT', 'STACK_FLAT'],
+        null,
+        true
+    );
+
+    await cancelOrder(result.orderId);
+
+    const couponResult = await pool.query(
+        `SELECT code, times_used
+         FROM coupons
+         WHERE code IN ($1, $2)
+         ORDER BY code`,
+        ['STACK_FLAT', 'STACK_PERCENT']
+    );
+
+    assert.equal(Number(couponResult.rows[0].times_used), 0);
+    assert.equal(Number(couponResult.rows[1].times_used), 0);
 });
