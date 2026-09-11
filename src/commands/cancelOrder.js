@@ -36,24 +36,18 @@ export async function cancelOrder(orderId) {
       throw new Error(`Order "${orderId}" is already cancelled`);
     }
 
-    if (order.coupon_code !== null) {
-      // Lock the coupon before changing its usage count.
-      const couponResult = await client.query(
-        `SELECT code, times_used
-         FROM coupons
-         WHERE code = $1
-         FOR UPDATE`,
-        [order.coupon_code]
-      );
+    const couponResult = await client.query(
+      `SELECT code FROM order_coupons WHERE order_id = $1`,
+      [orderId]
+    );
 
-      if (couponResult.rows.length > 0) {
-        await client.query(
-          `UPDATE coupons
-           SET times_used = GREATEST(times_used - 1, 0)
-           WHERE code = $1`,
-          [order.coupon_code]
-        );
-      }
+    for (const coupon of couponResult.rows) {
+      await client.query(
+        `UPDATE coupons
+         SET times_used = GREATEST(times_used - 1, 0)
+         WHERE code = $1`,
+         [coupon.code]
+      );
     }
 
     await client.query(
