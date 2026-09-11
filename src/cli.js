@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import readline from 'node:readline';
 import { createCoupon } from './commands/createCoupon.js';
 import { applyCoupon } from './commands/applyCoupon.js';
 import { applyCoupons } from './commands/applyCoupons.js';
@@ -51,17 +52,23 @@ async function main() {
       console.log(`Discount: ${preview.discountAmount}`);
       console.log(`Final total: ${preview.finalTotal}`);
 
-      process.stdout.write('Proceed with this order? (y/n): ');
-
-      const answer = await new Promise((resolve) => {
-        process.stdin.once('data', (data) => {
-          resolve(data.toString().trim().toLowerCase());
+      // Only ask for confirmation if at least one coupon failed.
+      if (preview.invalidCoupons.length > 0) {
+        const rl = readline.createInterface({
+          input: process.stdin,
+          output: process.stdout,
         });
-      });
 
-      if (answer !== 'y' && answer !== 'yes') {
-        console.log('Order cancelled. No coupons were consumed.');
-        break;
+        const answer = await new Promise((resolve) => {
+          rl.question('Proceed with this order? (y/n): ', resolve);
+        });
+
+        rl.close();
+
+        if (answer.trim().toLowerCase() !== 'y') {
+          console.log('Order cancelled. No coupons were consumed.');
+          break;
+        }
       }
 
       const result = await applyCoupons(
