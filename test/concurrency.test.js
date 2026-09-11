@@ -7,6 +7,7 @@ import { applyCoupon } from '../src/commands/applyCoupon.js';
 test('global usage limit is safe under concurrent applications', async () => {
     const code = 'CONCURRENT1';
 
+    await pool.query('DELETE FROM order_coupons');
     await pool.query('DELETE FROM orders');
     await pool.query('DELETE FROM coupons');
 
@@ -50,6 +51,7 @@ test('global usage limit is safe under concurrent applications', async () => {
 test('per-user usage limit is safe under concurrent applications', async () => {
     const code = 'CONCURRENT_USER';
 
+    await pool.query('DELETE FROM order_coupons');
     await pool.query('DELETE FROM orders');
     await pool.query('DELETE FROM coupons');
 
@@ -96,6 +98,7 @@ test('per-user usage limit is safe under concurrent applications', async () => {
 test('failed transaction rolls back coupon usage', async () => {
     const code = 'ROLLBACK1';
 
+    await pool.query('DELETE FROM order_coupons');
     await pool.query('DELETE FROM orders');
     await pool.query('DELETE FROM coupons');
 
